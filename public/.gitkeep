@@ -1,0 +1,2 @@
+# Folder agar Vercel tidak error "No Output Directory named public"
+# Proyek ini API serverless; semua request di-rewrite ke /api
