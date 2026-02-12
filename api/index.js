@@ -12,7 +12,16 @@ async function getApp() {
 }
 
 module.exports = async (req, res) => {
-  const app = await getApp();
-  const expressApp = app.getHttpAdapter().getInstance();
-  return expressApp(req, res);
+  try {
+    const app = await getApp();
+    const expressApp = app.getHttpAdapter().getInstance();
+    return expressApp(req, res);
+  } catch (err) {
+    console.error('[OTR API] Serverless function crash:', err?.message || err);
+    console.error(err?.stack);
+    res.status(500).json({
+      error: 'FUNCTION_INVOCATION_FAILED',
+      message: process.env.NODE_ENV === 'production' ? 'Server error' : (err?.message || String(err)),
+    });
+  }
 };

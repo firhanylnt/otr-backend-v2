@@ -46,3 +46,4 @@ uploads/
 *.seed
 *.pid.lock
 .cache/
+.env*.local
