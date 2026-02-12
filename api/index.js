@@ -12,6 +12,15 @@ async function getApp() {
 }
 
 module.exports = async (req, res) => {
+  const path = (req.url || req.path || '').split('?')[0];
+
+  // Health check tanpa load Nest/DB — untuk cek apakah function jalan
+  if (path === '/api/health' || path === '/health') {
+    res.setHeader('Content-Type', 'application/json');
+    res.status(200).end(JSON.stringify({ status: 'ok', service: 'otr-api' }));
+    return;
+  }
+
   try {
     const app = await getApp();
     const expressApp = app.getHttpAdapter().getInstance();
@@ -19,6 +28,7 @@ module.exports = async (req, res) => {
   } catch (err) {
     console.error('[OTR API] Serverless function crash:', err?.message || err);
     console.error(err?.stack);
+    res.setHeader('Content-Type', 'application/json');
     res.status(500).json({
       error: 'FUNCTION_INVOCATION_FAILED',
       message: process.env.NODE_ENV === 'production' ? 'Server error' : (err?.message || String(err)),
