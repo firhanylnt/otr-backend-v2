@@ -1,0 +1,82 @@
+-- Jalankan script ini di Supabase Dashboard → SQL Editor (jika migration:run gagal ENOTFOUND)
+-- Enable extension untuk uuid_generate_v4()
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Tabel untuk tracking migration (TypeORM)
+CREATE TABLE IF NOT EXISTS "migrations" ("id" SERIAL NOT NULL, "timestamp" bigint NOT NULL, "name" character varying NOT NULL, CONSTRAINT "PK_8c82d7f526340ab934260ea46f" PRIMARY KEY ("id"));
+
+CREATE TABLE "genres" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "name" character varying NOT NULL, "slug" character varying NOT NULL, "description" text, "color" character varying, "isActive" boolean NOT NULL DEFAULT true, "sortOrder" integer NOT NULL DEFAULT '0', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_d1cbe4fe39bdfc77c76e94eada5" UNIQUE ("slug"), CONSTRAINT "PK_80ecd718f0f00dde5d77a9be842" PRIMARY KEY ("id"));
+CREATE TABLE "moods" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "name" character varying NOT NULL, "slug" character varying NOT NULL, "description" text, "color" character varying, "isActive" boolean NOT NULL DEFAULT true, "sortOrder" integer NOT NULL DEFAULT '0', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_e9d193c85b73adfd7e903acdf15" UNIQUE ("slug"), CONSTRAINT "PK_5e8d7a76ab84b2b527458490774" PRIMARY KEY ("id"));
+CREATE TYPE "public"."albums_type_enum" AS ENUM('album', 'mixtape', 'ep');
+CREATE TYPE "public"."albums_status_enum" AS ENUM('draft', 'pending', 'approved', 'rejected', 'published', 'hidden');
+CREATE TABLE "albums" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "title" character varying NOT NULL, "slug" character varying NOT NULL, "description" text, "coverUrl" character varying, "bannerUrl" character varying, "type" "public"."albums_type_enum" NOT NULL DEFAULT 'album', "plays" integer NOT NULL DEFAULT '0', "likes" integer NOT NULL DEFAULT '0', "status" "public"."albums_status_enum" NOT NULL DEFAULT 'draft', "creatorId" uuid, "isOtrPick" boolean NOT NULL DEFAULT false, "isFeatured" boolean NOT NULL DEFAULT false, "publishedAt" TIMESTAMP, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_95d212fead2c16a7b517c8f55fc" UNIQUE ("slug"), CONSTRAINT "PK_838ebae24d2e12082670ffc95d7" PRIMARY KEY ("id"));
+CREATE TYPE "public"."playlists_status_enum" AS ENUM('draft', 'published', 'hidden');
+CREATE TABLE "playlists" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "title" character varying NOT NULL, "slug" character varying NOT NULL, "description" text, "coverUrl" character varying, "plays" integer NOT NULL DEFAULT '0', "likes" integer NOT NULL DEFAULT '0', "status" "public"."playlists_status_enum" NOT NULL DEFAULT 'draft', "creatorId" uuid, "isOtrPick" boolean NOT NULL DEFAULT false, "isFeatured" boolean NOT NULL DEFAULT false, "publishedAt" TIMESTAMP, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_8bc3ed694cc8c188f8c65030c82" UNIQUE ("slug"), CONSTRAINT "PK_a4597f4189a75d20507f3f7ef0d" PRIMARY KEY ("id"));
+CREATE TYPE "public"."songs_status_enum" AS ENUM('draft', 'pending', 'approved', 'rejected', 'published', 'hidden');
+CREATE TABLE "songs" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "title" character varying NOT NULL, "slug" character varying NOT NULL, "description" text, "coverUrl" character varying, "bannerUrl" character varying, "audioUrl" character varying, "duration" character varying, "plays" integer NOT NULL DEFAULT '0', "likes" integer NOT NULL DEFAULT '0', "status" "public"."songs_status_enum" NOT NULL DEFAULT 'draft', "rejectionReason" text, "creatorId" uuid, "reviewedBy" character varying, "reviewedAt" TIMESTAMP, "publishedAt" TIMESTAMP, "isOtrPick" boolean NOT NULL DEFAULT false, "isFeatured" boolean NOT NULL DEFAULT false, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_56aae0d8ac9db4626985e2257e8" UNIQUE ("slug"), CONSTRAINT "PK_e504ce8ad2e291d3a1d8f1ea2f4" PRIMARY KEY ("id"));
+CREATE TYPE "public"."users_role_enum" AS ENUM('user', 'creator', 'resident', 'admin');
+CREATE TYPE "public"."users_status_enum" AS ENUM('active', 'suspended', 'pending');
+CREATE TABLE "users" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "email" character varying NOT NULL, "username" character varying NOT NULL, "password" character varying NOT NULL, "displayName" character varying, "bio" text, "avatarUrl" character varying, "bannerUrl" character varying, "role" "public"."users_role_enum" NOT NULL DEFAULT 'user', "status" "public"."users_status_enum" NOT NULL DEFAULT 'active', "isVerified" boolean NOT NULL DEFAULT false, "lastActiveAt" TIMESTAMP, "genres" text, "nextShow" character varying, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_97672ac88f789774dd47f7c8be3" UNIQUE ("email"), CONSTRAINT "UQ_fe0bb3f6520ee0469504521e710" UNIQUE ("username"), CONSTRAINT "PK_a3ffb1c0c8416b9fc6f907b7433" PRIMARY KEY ("id"));
+CREATE TYPE "public"."subscribers_status_enum" AS ENUM('active', 'unsubscribed', 'bounced');
+CREATE TABLE "subscribers" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "email" character varying NOT NULL, "name" character varying, "status" "public"."subscribers_status_enum" NOT NULL DEFAULT 'active', "source" character varying, "emailsSent" integer NOT NULL DEFAULT '0', "emailsOpened" integer NOT NULL DEFAULT '0', "lastEmailAt" TIMESTAMP, "subscribedAt" TIMESTAMP NOT NULL DEFAULT now(), "unsubscribedAt" TIMESTAMP, "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_1a7163c08f0e57bd1c9821508b1" UNIQUE ("email"), CONSTRAINT "PK_cbe0a7a9256c826f403c0236b67" PRIMARY KEY ("id"));
+CREATE TABLE "settings" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "key" character varying NOT NULL, "value" text, "type" character varying, "group" character varying, "description" text, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_c8639b7626fa94ba8265628f214" UNIQUE ("key"), CONSTRAINT "PK_0669fe20e252eb692bf4d344975" PRIMARY KEY ("id"));
+CREATE TYPE "public"."program_shows_type_enum" AS ENUM('live', 'prerecorded', 'rerun');
+CREATE TABLE "program_shows" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "title" character varying NOT NULL, "slug" character varying NOT NULL, "description" text, "coverUrl" character varying, "dayOfWeek" integer NOT NULL, "startTime" character varying NOT NULL, "endTime" character varying NOT NULL, "type" "public"."program_shows_type_enum" NOT NULL DEFAULT 'live', "isRecurring" boolean NOT NULL DEFAULT true, "hostId" uuid, "genres" text, "isActive" boolean NOT NULL DEFAULT true, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_fc4ba1d08b7f249a50fcce2f089" UNIQUE ("slug"), CONSTRAINT "PK_6c3594e38ef173467dca1d4fa86" PRIMARY KEY ("id"));
+CREATE TABLE "products" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "name" character varying NOT NULL, "slug" character varying NOT NULL, "imageUrl" character varying, "price" numeric(10,2) NOT NULL, "shopUrl" character varying, "isActive" boolean NOT NULL DEFAULT true, "sortOrder" integer NOT NULL DEFAULT '0', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_464f927ae360106b783ed0b4106" UNIQUE ("slug"), CONSTRAINT "PK_0806c755e0aca124e67c0cf6d7d" PRIMARY KEY ("id"));
+CREATE TYPE "public"."otr_picks_contenttype_enum" AS ENUM('song', 'album', 'playlist', 'mixtape');
+CREATE TABLE "otr_picks" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "contentType" "public"."otr_picks_contenttype_enum" NOT NULL, "contentId" character varying NOT NULL, "curatorNote" text, "isActive" boolean NOT NULL DEFAULT true, "isFeatured" boolean NOT NULL DEFAULT false, "sortOrder" integer NOT NULL DEFAULT '0', "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_3b28f00c617e498ed30e1a78343" PRIMARY KEY ("id"));
+CREATE TABLE "listening_history" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "userId" uuid NOT NULL, "songId" uuid NOT NULL, "playCount" integer NOT NULL DEFAULT '0', "totalListenedDuration" double precision NOT NULL DEFAULT '0', "lastPosition" double precision NOT NULL DEFAULT '0', "songDuration" double precision, "completed" boolean NOT NULL DEFAULT false, "lastListenedAt" TIMESTAMP, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_a6c26e9fbd171c57d0f320300b8" PRIMARY KEY ("id"));
+CREATE INDEX "IDX_457cb9f7a9aa5b0f99547da7d3" ON "listening_history" ("userId");
+CREATE INDEX "IDX_c258e6e1f838d898bb5f9d2c90" ON "listening_history" ("songId");
+CREATE UNIQUE INDEX "IDX_007a8892f404c0dab2098f7d5e" ON "listening_history" ("userId", "songId");
+CREATE TYPE "public"."events_status_enum" AS ENUM('upcoming', 'ongoing', 'past', 'cancelled');
+CREATE TABLE "events" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "title" character varying NOT NULL, "slug" character varying NOT NULL, "description" text, "coverUrl" character varying, "bannerUrl" character varying, "venue" character varying NOT NULL, "address" character varying, "location" character varying NOT NULL, "eventDate" TIMESTAMP NOT NULL, "endDate" TIMESTAMP, "time" character varying NOT NULL, "tags" text, "ticketUrl" character varying, "price" character varying, "isFree" boolean NOT NULL DEFAULT false, "status" "public"."events_status_enum" NOT NULL DEFAULT 'upcoming', "lineup" text, "gallery" text, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_05bd884c03d3f424e2204bd14cd" UNIQUE ("slug"), CONSTRAINT "PK_40731c7151fe4be3116e45ddf73" PRIMARY KEY ("id"));
+CREATE TABLE "album_genres" ("albumId" uuid NOT NULL, "genreId" uuid NOT NULL, CONSTRAINT "PK_710eb085ad969f71c54b7842e0d" PRIMARY KEY ("albumId", "genreId"));
+CREATE INDEX "IDX_cb187cfb8f512f37e27cb51e61" ON "album_genres" ("albumId");
+CREATE INDEX "IDX_10aae8ded440e7c96bca9daaa5" ON "album_genres" ("genreId");
+CREATE TABLE "album_moods" ("albumId" uuid NOT NULL, "moodId" uuid NOT NULL, CONSTRAINT "PK_6de949501326f9a9f96cf7ab691" PRIMARY KEY ("albumId", "moodId"));
+CREATE INDEX "IDX_14772739df52d486c29ad14b63" ON "album_moods" ("albumId");
+CREATE INDEX "IDX_53c1c8ea4d59b556a90148311c" ON "album_moods" ("moodId");
+CREATE TABLE "album_songs" ("albumId" uuid NOT NULL, "songId" uuid NOT NULL, CONSTRAINT "PK_90faea9b897bc2812955eb67c53" PRIMARY KEY ("albumId", "songId"));
+CREATE INDEX "IDX_3035953fb2c41cf083948362fe" ON "album_songs" ("albumId");
+CREATE INDEX "IDX_31eca7fa78d88c94133efcea25" ON "album_songs" ("songId");
+CREATE TABLE "playlist_genres" ("playlistId" uuid NOT NULL, "genreId" uuid NOT NULL, CONSTRAINT "PK_587d2588207df141c161f601fce" PRIMARY KEY ("playlistId", "genreId"));
+CREATE INDEX "IDX_117bf1a4c23586c728c922a29f" ON "playlist_genres" ("playlistId");
+CREATE INDEX "IDX_c55ec4ac003adfbeb95d681bcd" ON "playlist_genres" ("genreId");
+CREATE TABLE "playlist_moods" ("playlistId" uuid NOT NULL, "moodId" uuid NOT NULL, CONSTRAINT "PK_bf176299c6bee5c33e9044d7215" PRIMARY KEY ("playlistId", "moodId"));
+CREATE INDEX "IDX_83f6d0220e553dbdcb30a4462f" ON "playlist_moods" ("playlistId");
+CREATE INDEX "IDX_ee58321621e3fdca071541be4b" ON "playlist_moods" ("moodId");
+CREATE TABLE "playlist_songs" ("playlistId" uuid NOT NULL, "songId" uuid NOT NULL, CONSTRAINT "PK_2c381af24b3c13d9b25b63c231c" PRIMARY KEY ("playlistId", "songId"));
+CREATE INDEX "IDX_b417e94c5022d641c977ef85d8" ON "playlist_songs" ("playlistId");
+CREATE INDEX "IDX_d6a09d42a96563d9d139b5f7fd" ON "playlist_songs" ("songId");
+CREATE TABLE "song_genres" ("songId" uuid NOT NULL, "genreId" uuid NOT NULL, CONSTRAINT "PK_722ca7a7b53120d4fe9e2d504cc" PRIMARY KEY ("songId", "genreId"));
+CREATE INDEX "IDX_f611a201a7d790d14b1c71a90b" ON "song_genres" ("songId");
+CREATE INDEX "IDX_8cb94843324244deb861b2ad3e" ON "song_genres" ("genreId");
+CREATE TABLE "song_moods" ("songId" uuid NOT NULL, "moodId" uuid NOT NULL, CONSTRAINT "PK_c268746f9921cde6c8bc774128c" PRIMARY KEY ("songId", "moodId"));
+CREATE INDEX "IDX_c46db5975afa8821b960e1620b" ON "song_moods" ("songId");
+CREATE INDEX "IDX_f8c3dcb83630ff224c8df4f2df" ON "song_moods" ("moodId");
+ALTER TABLE "albums" ADD CONSTRAINT "FK_177b69a3af833f1b76f4522c989" FOREIGN KEY ("creatorId") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+ALTER TABLE "playlists" ADD CONSTRAINT "FK_14bdc074919eefa637f70de8d79" FOREIGN KEY ("creatorId") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+ALTER TABLE "songs" ADD CONSTRAINT "FK_0783b89974321cca1f7d13566a0" FOREIGN KEY ("creatorId") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+ALTER TABLE "program_shows" ADD CONSTRAINT "FK_dfd85917d04ae521aeb99323758" FOREIGN KEY ("hostId") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+ALTER TABLE "listening_history" ADD CONSTRAINT "FK_457cb9f7a9aa5b0f99547da7d31" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+ALTER TABLE "listening_history" ADD CONSTRAINT "FK_c258e6e1f838d898bb5f9d2c904" FOREIGN KEY ("songId") REFERENCES "songs"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+ALTER TABLE "album_genres" ADD CONSTRAINT "FK_cb187cfb8f512f37e27cb51e61f" FOREIGN KEY ("albumId") REFERENCES "albums"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "album_genres" ADD CONSTRAINT "FK_10aae8ded440e7c96bca9daaa54" FOREIGN KEY ("genreId") REFERENCES "genres"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "album_moods" ADD CONSTRAINT "FK_14772739df52d486c29ad14b638" FOREIGN KEY ("albumId") REFERENCES "albums"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "album_moods" ADD CONSTRAINT "FK_53c1c8ea4d59b556a90148311ca" FOREIGN KEY ("moodId") REFERENCES "moods"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "album_songs" ADD CONSTRAINT "FK_3035953fb2c41cf083948362fe5" FOREIGN KEY ("albumId") REFERENCES "albums"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "album_songs" ADD CONSTRAINT "FK_31eca7fa78d88c94133efcea255" FOREIGN KEY ("songId") REFERENCES "songs"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+ALTER TABLE "playlist_genres" ADD CONSTRAINT "FK_117bf1a4c23586c728c922a29f7" FOREIGN KEY ("playlistId") REFERENCES "playlists"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "playlist_genres" ADD CONSTRAINT "FK_c55ec4ac003adfbeb95d681bcd0" FOREIGN KEY ("genreId") REFERENCES "genres"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "playlist_moods" ADD CONSTRAINT "FK_83f6d0220e553dbdcb30a4462f9" FOREIGN KEY ("playlistId") REFERENCES "playlists"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "playlist_moods" ADD CONSTRAINT "FK_ee58321621e3fdca071541be4b6" FOREIGN KEY ("moodId") REFERENCES "moods"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "playlist_songs" ADD CONSTRAINT "FK_b417e94c5022d641c977ef85d8b" FOREIGN KEY ("playlistId") REFERENCES "playlists"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "playlist_songs" ADD CONSTRAINT "FK_d6a09d42a96563d9d139b5f7fdf" FOREIGN KEY ("songId") REFERENCES "songs"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+ALTER TABLE "song_genres" ADD CONSTRAINT "FK_f611a201a7d790d14b1c71a90b3" FOREIGN KEY ("songId") REFERENCES "songs"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "song_genres" ADD CONSTRAINT "FK_8cb94843324244deb861b2ad3e1" FOREIGN KEY ("genreId") REFERENCES "genres"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "song_moods" ADD CONSTRAINT "FK_c46db5975afa8821b960e1620b3" FOREIGN KEY ("songId") REFERENCES "songs"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "song_moods" ADD CONSTRAINT "FK_f8c3dcb83630ff224c8df4f2dff" FOREIGN KEY ("moodId") REFERENCES "moods"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- Setelah selesai, tambahkan baris ke tabel migrations (agar TypeORM menganggap migration ini sudah jalan):
+INSERT INTO "migrations" ("timestamp", "name") VALUES (1768637568682, 'InitialSchema1768637568682');

@@ -35,8 +35,7 @@ import { HighlightsModule } from './modules/highlights/highlights.module';
     // Rate Limiting - Protection against DDoS and brute force attacks
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => [
+      useFactory: () => [
         {
           name: 'short',
           ttl: 1000, // 1 second
@@ -55,34 +54,40 @@ import { HighlightsModule } from './modules/highlights/highlights.module';
       ],
     }),
 
-    // Database
+    // Database: pakai DATABASE_URL (atau fallback ke DB_HOST/DB_PORT/...)
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        type: 'postgres',
-        host: configService.get('DB_HOST', 'localhost'),
-        port: configService.get<number>('DB_PORT', 5432),
-        username: configService.get('DB_USERNAME', 'postgres'),
-        password: configService.get('DB_PASSWORD', 'postgres'),
-        database: configService.get('DB_NAME', 'otr_db'),
-        entities: [__dirname + '/**/*.entity{.ts,.js}'],
-        synchronize: configService.get('NODE_ENV') === 'development',
-        logging: configService.get('NODE_ENV') === 'development',
-        // Timezone configuration - Jakarta UTC+7
-        timezone: 'Asia/Jakarta',
-        // Connection pool settings
-        extra: {
-          max: 20, // Maximum connections in pool
-          idleTimeoutMillis: 30000, // Close idle connections after 30s
-          connectionTimeoutMillis: 2000, // Timeout for new connections
-          // Set timezone for PostgreSQL connection
-          options: '-c timezone=Asia/Jakarta',
-        },
-        // SSL for production
-        ssl: configService.get('NODE_ENV') === 'production' 
-          ? { rejectUnauthorized: false } 
-          : false,
-      }),
+      useFactory: (configService: ConfigService) => {
+        const databaseUrl = configService.get<string>('DATABASE_URL');
+        const useSsl = databaseUrl
+          ? !databaseUrl.includes('localhost')
+          : configService.get('DB_HOST') !== 'localhost';
+        const base = {
+          type: 'postgres' as const,
+          entities: [__dirname + '/**/*.entity{.ts,.js}'],
+          synchronize: configService.get('NODE_ENV') === 'development',
+          logging: configService.get('NODE_ENV') === 'development',
+          timezone: 'Asia/Jakarta',
+          extra: {
+            max: 20,
+            idleTimeoutMillis: 30000,
+            connectionTimeoutMillis: 2000,
+            options: '-c timezone=Asia/Jakarta',
+          },
+          ssl: useSsl ? { rejectUnauthorized: false } : false,
+        };
+        if (databaseUrl) {
+          return { ...base, url: databaseUrl };
+        }
+        return {
+          ...base,
+          host: configService.get<string>('DB_HOST', 'localhost'),
+          port: configService.get<number>('DB_PORT', 5432),
+          username: configService.get<string>('DB_USERNAME', 'postgres'),
+          password: configService.get<string>('DB_PASSWORD', 'postgres'),
+          database: configService.get<string>('DB_NAME', 'otr_db'),
+        };
+      },
       inject: [ConfigService],
     }),
 
