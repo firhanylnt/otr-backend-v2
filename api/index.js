@@ -12,14 +12,30 @@ async function getApp() {
 }
 
 module.exports = async (req, res) => {
-  let path = (req.url || req.path || '').split('?')[0];
-  const query = (req.url || '').includes('?') ? (req.url || '').split('?')[1] : '';
-
-  // Pastikan path untuk Nest selalu diawali /api (Nest pakai setGlobalPrefix('api'))
-  if (path && !path.startsWith('/api')) {
-    path = '/api' + (path === '/' ? '' : path);
-    req.url = query ? path + '?' + query : path;
+  let raw = (req.url || req.path || '').trim();
+  let path;
+  let query = '';
+  if (raw.includes('?')) {
+    const idx = raw.indexOf('?');
+    path = raw.slice(0, idx);
+    query = raw.slice(idx + 1);
+  } else {
+    path = raw;
   }
+  // Vercel can pass full URL in req.url — use pathname only
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    try {
+      path = new URL(path).pathname;
+    } catch (_) {
+      path = path.replace(/^https?:\/\/[^/]+/, '') || '/';
+    }
+  }
+  // Normalize: collapse slashes, ensure /api prefix for Nest globalPrefix
+  path = (path || '/').replace(/\/+/g, '/') || '/';
+  if (path !== '/api' && !path.startsWith('/api/')) {
+    path = '/api' + (path === '/' ? '' : path);
+  }
+  req.url = query ? path + '?' + query : path;
 
   // Health check tanpa load Nest/DB — untuk cek apakah function jalan
   if (path === '/api/health' || path === '/health') {
