@@ -40,7 +40,16 @@ module.exports = async (req, res) => {
   if (path !== '/api' && !path.startsWith('/api/')) {
     path = '/api' + (path === '/' ? '' : path);
   }
-  req.url = queryString ? path + '?' + queryString : path;
+  const fullUrl = queryString ? path + '?' + queryString : path;
+  req.url = fullUrl;
+  req.path = path; // Express router matches on path; Vercel may have set path from destination /api
+  req.originalUrl = req.originalUrl || fullUrl;
+  // Ensure method is set (Vercel/Node compat)
+  if (!req.method && req.headers) {
+    const override = req.headers['x-http-method-override'] || req.headers['x-method-override'];
+    if (override) req.method = String(override).toUpperCase();
+  }
+  req.method = (req.method || 'GET').toUpperCase();
 
   // Health check tanpa load Nest/DB — untuk cek apakah function jalan
   if (path === '/api/health' || path === '/health') {
@@ -52,7 +61,16 @@ module.exports = async (req, res) => {
   try {
     const app = await getApp();
     const expressApp = app.getHttpAdapter().getInstance();
-    return expressApp(req, res);
+    await new Promise((resolve, reject) => {
+      res.on('finish', resolve);
+      res.on('close', resolve);
+      res.on('error', reject);
+      expressApp(req, res);
+      // If Express sync sends and doesn't emit 'finish', resolve after a tick
+      setImmediate(() => {
+        if (res.writableEnded) resolve();
+      });
+    });
   } catch (err) {
     console.error('[OTR API] Serverless function crash:', err?.message || err);
     console.error(err?.stack);
