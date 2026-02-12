@@ -11,52 +11,75 @@ async function getApp() {
   return cachedApp;
 }
 
+function wrapReq(origReq, overrides) {
+  return new Proxy(origReq, {
+    get(target, prop) {
+      if (Object.prototype.hasOwnProperty.call(overrides, prop)) return overrides[prop];
+      return target[prop];
+    },
+  });
+}
+
 module.exports = async (req, res) => {
-  // Vercel rewrite sends destination path in req.url; original path is in ?__path= (see vercel.json)
-  let raw = (req.url || req.path || '').trim();
   let path;
   let queryString = '';
-  if (raw.includes('?')) {
-    const idx = raw.indexOf('?');
-    path = raw.slice(0, idx);
-    queryString = raw.slice(idx + 1);
-  } else {
-    path = raw;
-  }
-  const params = new URLSearchParams(queryString);
-  const originalPath = params.get('__path');
-  if (originalPath != null && originalPath !== '') {
-    path = originalPath.startsWith('/') ? originalPath : '/' + originalPath;
-    params.delete('__path');
-    queryString = params.toString();
-  } else if (path.startsWith('http://') || path.startsWith('https://')) {
+  const raw = String(req.url || req.path || '').trim();
+
+  // 1) Full URL (e.g. Vercel sometimes passes original URL) -> use pathname
+  if (raw.startsWith('http://') || raw.startsWith('https://')) {
     try {
-      path = new URL(path).pathname;
+      const u = new URL(raw);
+      path = u.pathname;
+      queryString = u.search ? u.search.slice(1) : '';
     } catch (_) {
-      path = path.replace(/^https?:\/\/[^/]+/, '') || '/';
+      path = raw.replace(/^https?:\/\/[^/]+/, '') || '/';
+      const q = path.indexOf('?');
+      if (q !== -1) {
+        queryString = path.slice(q + 1);
+        path = path.slice(0, q);
+      }
+    }
+  } else {
+    const q = raw.indexOf('?');
+    if (q !== -1) {
+      path = raw.slice(0, q);
+      queryString = raw.slice(q + 1);
+    } else {
+      path = raw;
     }
   }
+
+  // 2) Rewrite sends original path in __path (vercel.json: destination /api?__path=:path)
+  const params = new URLSearchParams(queryString);
+  const fromRewrite = params.get('__path');
+  if (fromRewrite != null && fromRewrite !== '') {
+    path = fromRewrite.startsWith('/') ? fromRewrite : '/' + fromRewrite;
+    params.delete('__path');
+    queryString = params.toString();
+  }
+
   path = (path || '/').replace(/\/+/g, '/') || '/';
   if (path !== '/api' && !path.startsWith('/api/')) {
     path = '/api' + (path === '/' ? '' : path);
   }
   const fullUrl = queryString ? path + '?' + queryString : path;
-  req.url = fullUrl;
-  req.path = path; // Express router matches on path; Vercel may have set path from destination /api
-  req.originalUrl = req.originalUrl || fullUrl;
-  // Ensure method is set (Vercel/Node compat)
-  if (!req.method && req.headers) {
-    const override = req.headers['x-http-method-override'] || req.headers['x-method-override'];
-    if (override) req.method = String(override).toUpperCase();
-  }
-  req.method = (req.method || 'GET').toUpperCase();
+  const method = (req.method || 'GET').toUpperCase();
 
-  // Health check tanpa load Nest/DB — untuk cek apakah function jalan
+  // Health check tanpa load Nest/DB
   if (path === '/api/health' || path === '/health') {
     res.setHeader('Content-Type', 'application/json');
     res.status(200).end(JSON.stringify({ status: 'ok', service: 'otr-api' }));
     return;
   }
+
+  const debugHeader = req.headers && (req.headers['x-debug-path'] === '1' || req.headers['x-debug-path'] === 'true');
+  if (process.env.OTR_DEBUG === '1' || debugHeader) {
+    res.setHeader('Content-Type', 'application/json');
+    res.status(200).end(JSON.stringify({ path, method, rawUrl: raw, fromRewrite: fromRewrite ?? null }));
+    return;
+  }
+
+  const wrappedReq = wrapReq(req, { url: fullUrl, path, originalUrl: fullUrl, method });
 
   try {
     const app = await getApp();
@@ -65,8 +88,7 @@ module.exports = async (req, res) => {
       res.on('finish', resolve);
       res.on('close', resolve);
       res.on('error', reject);
-      expressApp(req, res);
-      // If Express sync sends and doesn't emit 'finish', resolve after a tick
+      expressApp(wrappedReq, res);
       setImmediate(() => {
         if (res.writableEnded) resolve();
       });

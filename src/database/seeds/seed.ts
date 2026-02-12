@@ -7,18 +7,14 @@ import { Mood } from '../../entities/mood.entity';
 import { Song } from '../../entities/song.entity';
 import { Album } from '../../entities/album.entity';
 import { Playlist } from '../../entities/playlist.entity';
+import { dataSourceOptions } from '../data-source';
 
 dotenv.config();
 
+// Use same config as app/migrations (DATABASE_URL or DB_*)
 const dataSource = new DataSource({
-  type: 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  username: process.env.DB_USERNAME || 'postgres',
-  password: process.env.DB_PASSWORD || 'postgres',
-  database: process.env.DB_NAME || 'otr_db',
+  ...dataSourceOptions,
   entities: [User, Genre, Mood, Song, Album, Playlist],
-  synchronize: false,
 });
 
 async function seed() {
