@@ -14,4 +14,9 @@ export class AppController {
       health: '/api/health',
     };
   }
+
+  @Get('health')
+  getHealth() {
+    return { status: 'ok', service: 'otr-api' };
+  }
 }

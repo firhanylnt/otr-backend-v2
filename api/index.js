@@ -12,7 +12,14 @@ async function getApp() {
 }
 
 module.exports = async (req, res) => {
-  const path = (req.url || req.path || '').split('?')[0];
+  let path = (req.url || req.path || '').split('?')[0];
+  const query = (req.url || '').includes('?') ? (req.url || '').split('?')[1] : '';
+
+  // Pastikan path untuk Nest selalu diawali /api (Nest pakai setGlobalPrefix('api'))
+  if (path && !path.startsWith('/api')) {
+    path = '/api' + (path === '/' ? '' : path);
+    req.url = query ? path + '?' + query : path;
+  }
 
   // Health check tanpa load Nest/DB — untuk cek apakah function jalan
   if (path === '/api/health' || path === '/health') {
