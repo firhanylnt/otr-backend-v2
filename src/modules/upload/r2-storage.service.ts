@@ -5,7 +5,7 @@ import {
   PutObjectCommand,
   PutObjectCommandInput,
 } from '@aws-sdk/client-s3';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { extname } from 'path';
 
 @Injectable()
@@ -64,7 +64,7 @@ export class R2StorageService {
     }
 
     const ext = originalName ? extname(originalName) : this.getExtFromMime(mimeType);
-    const key = `${folder}/${uuidv4()}${ext}`;
+    const key = `${folder}/${randomUUID()}${ext}`;
 
     const params: PutObjectCommandInput = {
       Bucket: this.bucket,
