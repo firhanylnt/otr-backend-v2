@@ -1,14 +1,19 @@
 /**
- * Vercel Serverless Function - Entry point for NestJS API
- * All routes are rewritten to this handler via vercel.json
+ * Vercel Serverless Function - NestJS + serverless-http
+ * Jangan pakai app.listen(); pakai app.init() + serverless(expressApp).
  */
-let cachedApp = null;
+const serverless = require('serverless-http');
 
-async function getApp() {
-  if (cachedApp) return cachedApp;
+let cachedHandler = null;
+
+async function getHandler() {
+  if (cachedHandler) return cachedHandler;
   const { createApp } = require('../dist/main');
-  cachedApp = await createApp();
-  return cachedApp;
+  const app = await createApp();
+  await app.init(); // Penting: init tanpa listen
+  const expressApp = app.getHttpAdapter().getInstance();
+  cachedHandler = serverless(expressApp);
+  return cachedHandler;
 }
 
 function wrapReq(origReq, overrides) {
@@ -25,7 +30,6 @@ module.exports = async (req, res) => {
   let queryString = '';
   const raw = String(req.url || req.path || '').trim();
 
-  // 1) Full URL (e.g. Vercel sometimes passes original URL) -> use pathname
   if (raw.startsWith('http://') || raw.startsWith('https://')) {
     try {
       const u = new URL(raw);
@@ -49,7 +53,6 @@ module.exports = async (req, res) => {
     }
   }
 
-  // 2) Rewrite sends original path in __path (vercel.json: destination /api?__path=:path)
   const params = new URLSearchParams(queryString);
   const fromRewrite = params.get('__path');
   if (fromRewrite != null && fromRewrite !== '') {
@@ -65,7 +68,6 @@ module.exports = async (req, res) => {
   const fullUrl = queryString ? path + '?' + queryString : path;
   const method = (req.method || 'GET').toUpperCase();
 
-  // Health check tanpa load Nest/DB
   if (path === '/api/health' || path === '/health') {
     res.setHeader('Content-Type', 'application/json');
     res.status(200).end(JSON.stringify({ status: 'ok', service: 'otr-api' }));
@@ -82,17 +84,8 @@ module.exports = async (req, res) => {
   const wrappedReq = wrapReq(req, { url: fullUrl, path, originalUrl: fullUrl, method });
 
   try {
-    const app = await getApp();
-    const expressApp = app.getHttpAdapter().getInstance();
-    await new Promise((resolve, reject) => {
-      res.on('finish', resolve);
-      res.on('close', resolve);
-      res.on('error', reject);
-      expressApp(wrappedReq, res);
-      setImmediate(() => {
-        if (res.writableEnded) resolve();
-      });
-    });
+    const handler = await getHandler();
+    return await handler(wrappedReq, res);
   } catch (err) {
     console.error('[OTR API] Serverless function crash:', err?.message || err);
     console.error(err?.stack);

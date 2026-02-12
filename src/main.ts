@@ -97,6 +97,18 @@ export async function createApp() {
   // API prefix
   app.setGlobalPrefix('api');
 
+  // Catch-all 404 only when NOT on Vercel (serverless routing handles 404; avoid swallowing valid routes)
+  if (process.env.VERCEL !== '1') {
+    const expressApp = app.getHttpAdapter().getInstance();
+    expressApp.use((_req, res) => {
+      if (!res.headersSent) {
+        res
+          .status(404)
+          .json({ statusCode: 404, message: 'Not found', error: 'Not Found' });
+      }
+    });
+  }
+
   // Swagger documentation (only in development)
   if (process.env.NODE_ENV !== 'production') {
     const config = new DocumentBuilder()
