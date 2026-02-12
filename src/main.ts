@@ -117,6 +117,9 @@ export async function createApp() {
   return app;
 }
 
+// Default export agar Vercel tidak mengeluh "default export must be a function" bila main.js ikut di-load
+export default createApp;
+
 async function bootstrap() {
   const app = await createApp();
   const port = process.env.PORT || 3005;
